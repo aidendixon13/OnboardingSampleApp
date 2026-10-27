@@ -29,6 +29,10 @@ npm-debug.log*
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+/.playwright-mcp/
+
+# Generated sample uploads (npm run sample:zips)
+/sample-data/zips/
 
 # Coverage
 coverage/

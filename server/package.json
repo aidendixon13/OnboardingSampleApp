@@ -9,7 +9,9 @@
     "test": "node --test src/**/*.test.js"
   },
   "dependencies": {
+    "adm-zip": "^0.6.1",
     "cors": "^2.8.6",
-    "express": "^4.22.3"
+    "express": "^4.22.3",
+    "multer": "^2.5.0"
   }
 }

@@ -197,8 +197,7 @@ OnboardingStep {
 ```
 
 ### Seed Data
-- 1 example customer: **Acme Corporation**
-- 1 example onboarding state at 0% progress
+- None. The store starts empty; add customers through the Customer Info tab
 
 ### Progress Indicator
 - ✅ Static checklist showing all steps as pending

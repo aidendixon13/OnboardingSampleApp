@@ -9,10 +9,12 @@
     "install:all": "npm install && cd server && npm install && cd ../client && npm install",
     "test": "npm run test:unit && npm run test:e2e",
     "test:unit": "node --test scripts/check-node.test.js && cd server && npm test",
-    "test:e2e": "npx playwright test"
+    "test:e2e": "npx playwright test",
+    "sample:zips": "node scripts/build-sample-zips.js"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2",
-    "@playwright/test": "^1.40.0"
+    "@playwright/test": "^1.40.0",
+    "adm-zip": "^0.6.1",
+    "concurrently": "^8.2.2"
   }
 }

@@ -3,50 +3,14 @@
  * Simple storage for the training exercise - no database needed
  */
 
-const { createCustomer, createTenant, createDefaultOnboardingSteps } = require('../models');
-
 // In-memory storage
 const store = {
   customers: [],
   tenants: [],
-  onboardingStates: []
+  onboardingStates: [],
+  // Parsed customer data bundles, keyed by customer ID
+  customerData: new Map()
 };
-
-// Seed with example data
-function seedData() {
-  // Example customer - Acme Corporation
-  const exampleCustomer = createCustomer({
-    id: 'cust_001',
-    name: 'Acme Corporation',
-    industry: 'Manufacturing',
-    region: 'North America',
-    contactEmail: 'onboarding@acme.example.com',
-    createdAt: '2025-01-15T10:00:00Z'
-  });
-
-  // Example tenant for Acme
-  const exampleTenant = createTenant({
-    id: 'tenant_001',
-    customerId: 'cust_001',
-    status: 'pending',
-    plan: 'professional',
-    createdAt: '2025-01-15T10:00:00Z'
-  });
-
-  // Example onboarding state - just started, nothing completed
-  const exampleOnboardingState = {
-    customerId: 'cust_001',
-    steps: createDefaultOnboardingSteps(),
-    progressPercent: 0
-  };
-
-  store.customers.push(exampleCustomer);
-  store.tenants.push(exampleTenant);
-  store.onboardingStates.push(exampleOnboardingState);
-}
-
-// Initialize with seed data
-seedData();
 
 // Store access functions
 function getCustomers() {
@@ -97,7 +61,18 @@ function updateOnboardingState(customerId, updates) {
   return null;
 }
 
+function getCustomerData(customerId) {
+  return store.customerData.get(customerId);
+}
+
+function setCustomerData(customerId, data) {
+  store.customerData.set(customerId, data);
+  return data;
+}
+
 module.exports = {
+  getCustomerData,
+  setCustomerData,
   getCustomers,
   getCustomerById,
   addCustomer,
