@@ -84,7 +84,7 @@ function App() {
             data={onboardingData}
             loading={loading}
             error={error}
-            onImported={startIntake}
+            onOpenImport={() => setActiveTab('import')}
             onOpenStep={openStep}
           />
         )}
@@ -129,14 +129,14 @@ function App() {
           />
         )}
         {activeTab === 'import' && (
-          <PlaceholderTab title="Import" description="Import customer data into the platform" />
+          <ImportUpload onImported={startIntake} />
         )}
       </main>
     </div>
   );
 }
 
-function DashboardTab({ data, loading, error, onImported, onOpenStep }) {
+function DashboardTab({ data, loading, error, onOpenImport, onOpenStep }) {
   if (loading) {
     return <div className="placeholder"><p>Loading...</p></div>;
   }
@@ -150,17 +150,18 @@ function DashboardTab({ data, loading, error, onImported, onOpenStep }) {
     );
   }
 
-  return (
-    <div>
-      <ImportUpload onImported={onImported} />
+  if (data.length === 0) {
+    return (
+      <div className="placeholder">
+        <p>No customers in the onboarding queue</p>
+        <button type="button" className="submit-button empty-action" onClick={onOpenImport}>
+          Import customer data
+        </button>
+      </div>
+    );
+  }
 
-      {data.length === 0 ? (
-        <div className="placeholder"><p>No customers in the onboarding queue</p></div>
-      ) : (
-        <OnboardingQueue data={data} onOpenStep={onOpenStep} />
-      )}
-    </div>
-  );
+  return <OnboardingQueue data={data} onOpenStep={onOpenStep} />;
 }
 
 function OnboardingQueue({ data, onOpenStep }) {
@@ -238,18 +239,6 @@ function Checklist({ steps }) {
         </li>
       ))}
     </ul>
-  );
-}
-
-function PlaceholderTab({ title, description }) {
-  return (
-    <div className="placeholder">
-      <h2>{title}</h2>
-      <p>{description}</p>
-      <p style={{ marginTop: '20px', fontSize: '0.9rem' }}>
-        🚧 This section is ready to be built
-      </p>
-    </div>
   );
 }
 

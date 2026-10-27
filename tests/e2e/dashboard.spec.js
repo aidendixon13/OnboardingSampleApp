@@ -10,6 +10,13 @@ function sampleBundle(folder) {
   return { name: `${folder}.zip`, mimeType: 'application/zip', buffer: zip.toBuffer() };
 }
 
+/** Uploads a sample folder from the Import tab. */
+async function uploadSample(page, folder) {
+  await page.getByRole('button', { name: 'Import', exact: true }).click();
+  await page.getByLabel('Customer data (.zip)').setInputFiles(sampleBundle(folder));
+  await page.getByRole('button', { name: 'Upload' }).click();
+}
+
 /** Fills the intake fields with a unique name so parallel tests don't collide. */
 async function fillCustomerFields(page, name) {
   await page.getByLabel('Customer name').fill(name);
@@ -51,8 +58,10 @@ test.describe('Onboarding Dashboard', () => {
   test('should switch between tabs', async ({ page }) => {
     await page.goto('/');
 
-    // Customer Info shows customer details; the upload lives on the dashboard
-    await expect(page.locator('.import-upload h2')).toContainText('Import customer data');
+    // The upload lives on the Import tab, not the dashboard
+    await expect(page.locator('.import-upload')).toHaveCount(0);
+
+    // Customer Info shows customer details
     await page.getByRole('button', { name: 'Customer Info' }).click();
     await expect(page.locator('.customer-details h2')).toContainText('Customer Info');
 
@@ -60,17 +69,16 @@ test.describe('Onboarding Dashboard', () => {
     await page.getByRole('button', { name: 'Data Mapping' }).click();
     await expect(page.locator('main h2')).toContainText('Data Mapping');
 
-    // Later steps are still placeholders
+    // Import holds the customer data upload
     await page.getByRole('button', { name: 'Import', exact: true }).click();
-    await expect(page.locator('.placeholder h2')).toContainText('Import');
+    await expect(page.locator('.import-upload h2')).toContainText('Import customer data');
   });
 
   test('should onboard a customer from an uploaded data folder', async ({ page }) => {
     await page.goto('/');
 
-    // Upload from the dashboard opens the intake page with the name pre-filled
-    await page.getByLabel('Customer data (.zip)').setInputFiles(sampleBundle('CustomerC_PremierBookkeeping'));
-    await page.getByRole('button', { name: 'Upload' }).click();
+    // Upload from the Import tab opens the intake page with the name pre-filled
+    await uploadSample(page, 'CustomerC_PremierBookkeeping');
     await expect(page.locator('.customer-form h2')).toContainText('Customer Info');
     await expect(page.getByLabel('Customer name')).toHaveValue('Premier Bookkeeping');
     await expect(page.locator('.import-summary')).toContainText('12 clients');
@@ -118,8 +126,7 @@ test.describe('Onboarding Dashboard', () => {
 
   test('should review and approve the mapping and tenant', async ({ page }) => {
     await page.goto('/');
-    await page.getByLabel('Customer data (.zip)').setInputFiles(sampleBundle('CustomerC_PremierBookkeeping'));
-    await page.getByRole('button', { name: 'Upload' }).click();
+    await uploadSample(page, 'CustomerC_PremierBookkeeping');
     const name = `Approval Flow ${Date.now()}`;
     await fillCustomerFields(page, name);
     await page.getByLabel('Plan').selectOption('starter');
@@ -152,8 +159,7 @@ test.describe('Onboarding Dashboard', () => {
   test('should reject a data folder with malformed rows and say where', async ({ page }) => {
     await page.goto('/');
 
-    await page.getByLabel('Customer data (.zip)').setInputFiles(sampleBundle('CustomerA_ABCAccounting'));
-    await page.getByRole('button', { name: 'Upload' }).click();
+    await uploadSample(page, 'CustomerA_ABCAccounting');
 
     await expect(page.locator('.bundle-problems')).toContainText('chart_of_accounts.csv: Line 33');
     await expect(page.locator('.customer-form')).toHaveCount(0);

@@ -231,7 +231,7 @@ function CustomerDetails({ customers, selectedId, onSelect }) {
       <h2>Customer Info</h2>
       {customers.length === 0 ? (
         <div className="placeholder">
-          <p>No customers yet. Upload customer data on the Dashboard to start onboarding.</p>
+          <p>No customers yet. Upload customer data on the Import tab to start onboarding.</p>
         </div>
       ) : (
         <CustomerPicker customers={customers} selectedId={selectedId} onSelect={onSelect} />

@@ -482,3 +482,7 @@ header p {
 .tenant-form {
   max-width: 560px;
 }
+
+.empty-action {
+  margin-top: 16px;
+}
