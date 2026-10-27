@@ -50,4 +50,42 @@ function validateCustomerInput(body) {
   return { errors, value };
 }
 
-module.exports = { validateCustomerInput, PLANS };
+const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const MAX_SLUG_LENGTH = 48;
+
+/**
+ * Validates reviewer edits to a generated tenant.
+ * @param {unknown} body
+ * @returns {{ errors: Record<string, string>, value: { plan?: string, slug?: string } }}
+ */
+function validateTenantEdit(body) {
+  const errors = {};
+  const value = {};
+  const input = body && typeof body === 'object' ? body : {};
+
+  const unknown = Object.keys(input).filter(k => !['plan', 'slug'].includes(k));
+  if (unknown.length > 0) {
+    errors.form = `Unknown tenant field(s): ${unknown.join(', ')}`;
+  }
+  if (!('plan' in input) && !('slug' in input)) {
+    errors.form = 'Change the plan or the slug';
+  }
+
+  if ('plan' in input) {
+    if (!PLANS.includes(input.plan)) errors.plan = `Plan must be one of: ${PLANS.join(', ')}`;
+    else value.plan = input.plan;
+  }
+
+  if ('slug' in input) {
+    const slug = typeof input.slug === 'string' ? input.slug.trim() : '';
+    if (!SLUG_PATTERN.test(slug) || slug.length > MAX_SLUG_LENGTH) {
+      errors.slug = `Slug must be lowercase letters, digits, and single hyphens, up to ${MAX_SLUG_LENGTH} characters`;
+    } else {
+      value.slug = slug;
+    }
+  }
+
+  return { errors, value };
+}
+
+module.exports = { validateCustomerInput, validateTenantEdit, PLANS };

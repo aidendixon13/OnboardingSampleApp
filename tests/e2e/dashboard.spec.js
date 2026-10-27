@@ -116,6 +116,39 @@ test.describe('Onboarding Dashboard', () => {
     await expect(page.locator('.dataset-mapping').first()).toContainText('DD-MM-YYYY');
   });
 
+  test('should review and approve the mapping and tenant', async ({ page }) => {
+    await page.goto('/');
+    await page.getByLabel('Customer data (.zip)').setInputFiles(sampleBundle('CustomerC_PremierBookkeeping'));
+    await page.getByRole('button', { name: 'Upload' }).click();
+    const name = `Approval Flow ${Date.now()}`;
+    await fillCustomerFields(page, name);
+    await page.getByLabel('Plan').selectOption('starter');
+    await page.getByRole('button', { name: 'Create customer' }).click();
+    await page.getByRole('button', { name: 'Review data mapping' }).click();
+
+    // Approval waits until the reviewer resolves the unmapped values
+    const approve = page.getByRole('button', { name: 'Approve mapping' });
+    await expect(approve).toBeDisabled();
+    await page.getByLabel('Contacts Status value Suspended').selectOption('inactive');
+    await page.getByLabel('Transactions Payment method value Online Payment').selectOption('bank_transfer');
+    await expect(page.locator('.mapping-status')).toContainText('Ready to approve');
+    await approve.click();
+    await expect(page.locator('.mapping-status')).toContainText('Approved');
+
+    // Adjust and approve the tenant
+    await page.getByRole('button', { name: 'Tenant Setup' }).click();
+    await page.getByLabel('Plan').selectOption('enterprise');
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    await page.getByRole('button', { name: 'Approve tenant' }).click();
+    await expect(page.locator('.mapping-status')).toContainText('Approved');
+
+    // Three of four steps are done
+    await page.getByRole('button', { name: 'Dashboard' }).click();
+    const card = page.locator('.customer-card', { hasText: name });
+    await expect(card.locator('.progress-bar')).toContainText('75%');
+    await expect(card.locator('.tenant-line').first()).toContainText('enterprise · approved');
+  });
+
   test('should reject a data folder with malformed rows and say where', async ({ page }) => {
     await page.goto('/');
 

@@ -447,3 +447,38 @@ header p {
   color: #2563eb;
   text-decoration: underline;
 }
+
+.mapping-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mapping-status.approved {
+  background: #eff6ff;
+  color: #1e40af;
+}
+
+.mapping-table select {
+  padding: 4px 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  background: white;
+  max-width: 100%;
+}
+
+.value-map li + li {
+  margin-top: 4px;
+}
+
+.select-needs-review {
+  border-color: #f59e0b !important;
+  background: #fffbeb !important;
+}
+
+.tenant-form {
+  max-width: 560px;
+}

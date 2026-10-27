@@ -143,3 +143,82 @@ describe('POST /api/customers', () => {
     assert.strictEqual((await fetch(`${baseUrl}/api/imports/${staged.importId}`)).status, 200);
   });
 });
+
+describe('review and approval', () => {
+  async function send(method, url, body) {
+    const res = await fetch(`${baseUrl}${url}`, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body)
+    });
+    return { status: res.status, body: await res.json() };
+  }
+
+  async function onboardPremier(name) {
+    const { body: staged } = await uploadBundle(sampleZip('CustomerC_PremierBookkeeping'));
+    const { body } = await createCustomer({ ...INTAKE, name, importId: staged.importId });
+    return body.customer.id;
+  }
+
+  it('lists the standard picklists and date formats', async () => {
+    const { body } = await send('GET', '/api/standards');
+    assert.ok(body.enums.paymentMethod.includes('bank_transfer'));
+    assert.ok(body.dateFormats.includes('DD-MM-YYYY'));
+  });
+
+  it('refuses to approve a mapping with open items, then approves once they are resolved', async () => {
+    const id = await onboardPremier('Review Flow Ltd');
+
+    const early = await send('POST', `/api/customers/${id}/mapping/approve`);
+    assert.strictEqual(early.status, 409);
+    assert.strictEqual(early.body.issues.length, 2);
+
+    const bad = await send('PATCH', `/api/customers/${id}/mapping/contacts/status`, { values: { Suspended: 'paused' } });
+    assert.strictEqual(bad.status, 400);
+
+    await send('PATCH', `/api/customers/${id}/mapping/contacts/status`, { values: { Suspended: 'inactive' } });
+    const edited = await send('PATCH', `/api/customers/${id}/mapping/transactions/paymentMethod`, { values: { 'Online Payment': 'bank_transfer' } });
+    assert.strictEqual(edited.status, 200);
+    assert.deepStrictEqual(edited.body.issues, []);
+
+    const approved = await send('POST', `/api/customers/${id}/mapping/approve`);
+    assert.strictEqual(approved.status, 200);
+    assert.strictEqual(approved.body.mapping.status, 'approved');
+    assert.strictEqual(approved.body.onboarding.steps.find(s => s.name === 'Data Mapping').status, 'completed');
+    assert.strictEqual(approved.body.onboarding.progressPercent, 50);
+
+    const locked = await send('PATCH', `/api/customers/${id}/mapping/clients/name`, { source: null });
+    assert.strictEqual(locked.status, 409);
+  });
+
+  it('edits and approves the tenant, then locks it', async () => {
+    const id = await onboardPremier('Tenant Flow Ltd');
+
+    const badSlug = await send('PATCH', `/api/customers/${id}/tenant`, { slug: 'Not Valid!' });
+    assert.strictEqual(badSlug.status, 400);
+    assert.ok(badSlug.body.fields.slug);
+
+    const edited = await send('PATCH', `/api/customers/${id}/tenant`, { plan: 'enterprise', slug: 'tenant-flow' });
+    assert.strictEqual(edited.status, 200);
+    assert.strictEqual(edited.body.plan, 'enterprise');
+    assert.strictEqual(edited.body.slug, 'tenant-flow');
+
+    const other = await onboardPremier('Other Tenant Ltd');
+    const taken = await send('PATCH', `/api/customers/${other}/tenant`, { slug: 'tenant-flow' });
+    assert.strictEqual(taken.status, 400);
+    assert.match(taken.body.fields.slug, /already used/);
+
+    const approved = await send('POST', `/api/customers/${id}/tenant/approve`);
+    assert.strictEqual(approved.status, 200);
+    assert.strictEqual(approved.body.tenant.status, 'approved');
+    assert.strictEqual(approved.body.onboarding.steps.find(s => s.name === 'Tenant Setup').status, 'completed');
+
+    assert.strictEqual((await send('PATCH', `/api/customers/${id}/tenant`, { plan: 'starter' })).status, 409);
+    assert.strictEqual((await send('POST', `/api/customers/${id}/tenant/approve`)).status, 409);
+  });
+
+  it('returns 404 for an unknown customer', async () => {
+    assert.strictEqual((await send('POST', '/api/customers/cust_nope/mapping/approve')).status, 404);
+    assert.strictEqual((await send('POST', '/api/customers/cust_nope/tenant/approve')).status, 404);
+  });
+});

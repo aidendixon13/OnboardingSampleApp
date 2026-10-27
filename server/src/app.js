@@ -4,11 +4,12 @@ const cors = require('cors');
 const multer = require('multer');
 const store = require('./data/store');
 const { createCustomer, createTenant, createDefaultOnboardingSteps, calculateProgress } = require('./models');
-const { validateCustomerInput } = require('./validation');
+const { validateCustomerInput, validateTenantEdit } = require('./validation');
 const { loadCustomerBundle, BundleError } = require('./loader/customerBundle');
 const { suggestCustomerName, toTenantSlug } = require('./naming');
 const { generateMapping, listMappingIssues } = require('./mapping/generateMapping');
 const { ENUMS } = require('./mapping/standards');
+const { applyFieldEdit, approveMapping, MappingEditError, DATE_FORMAT_LABELS } = require('./mapping/editMapping');
 
 const app = express();
 const MAX_BUNDLE_BYTES = 20 * 1024 * 1024;
@@ -26,6 +27,19 @@ function summarizeData(data) {
     rowCounts: Object.fromEntries(Object.entries(data.datasets).map(([key, d]) => [key, d.rows.length])),
     files: Object.fromEntries(Object.entries(data.datasets).map(([key, d]) => [key, { file: d.file, headers: d.headers }]))
   };
+}
+
+/** Sets one onboarding step's status and recalculates progress. */
+function setStepStatus(customerId, stepName, status) {
+  const state = store.getOnboardingState(customerId);
+  if (!state) throw new Error(`No onboarding state for customer ${customerId}`);
+  const steps = state.steps.map(step => (step.name === stepName ? { ...step, status } : step));
+  return store.updateOnboardingState(customerId, { steps, progressPercent: calculateProgress(steps) });
+}
+
+function sendMappingError(res, err) {
+  if (!(err instanceof MappingEditError)) throw err;
+  return res.status(err.status).json({ error: err.message, ...(err.issues && { issues: err.issues }) });
 }
 
 function mappingSummary(mapping) {
@@ -95,9 +109,12 @@ app.get('/api/imports/:id', (req, res) => {
   res.json(summarizeImport(staged));
 });
 
-// Standard picklist values, for choosing mapping targets during review
-app.get('/api/standards/enums', (req, res) => {
-  res.json(Object.fromEntries(Object.entries(ENUMS).map(([name, values]) => [name, Object.keys(values)])));
+// Standard picklist values and date formats, for choosing mapping targets during review
+app.get('/api/standards', (req, res) => {
+  res.json({
+    enums: Object.fromEntries(Object.entries(ENUMS).map(([name, values]) => [name, Object.keys(values)])),
+    dateFormats: DATE_FORMAT_LABELS
+  });
 });
 
 // Get all customers
@@ -158,6 +175,71 @@ app.get('/api/customers/:id/mapping', (req, res) => {
     return res.status(404).json({ error: 'Mapping not found' });
   }
   res.json(withIssues(mapping));
+});
+
+// Apply one reviewer edit to a mapped field
+app.patch('/api/customers/:id/mapping/:dataset/:field', (req, res) => {
+  const mapping = store.getMapping(req.params.id);
+  const data = store.getCustomerData(req.params.id);
+  if (!mapping || !data) {
+    return res.status(404).json({ error: 'Mapping not found' });
+  }
+  try {
+    const edited = applyFieldEdit(mapping, data.datasets, req.params.dataset, req.params.field, req.body);
+    res.json(withIssues(store.setMapping(req.params.id, edited)));
+  } catch (err) {
+    sendMappingError(res, err);
+  }
+});
+
+// Approve the mapping once nothing needs review; completes the Data Mapping step
+app.post('/api/customers/:id/mapping/approve', (req, res) => {
+  const mapping = store.getMapping(req.params.id);
+  if (!mapping) {
+    return res.status(404).json({ error: 'Mapping not found' });
+  }
+  let approved;
+  try {
+    approved = approveMapping(mapping);
+  } catch (err) {
+    return sendMappingError(res, err);
+  }
+  store.setMapping(req.params.id, approved);
+  const onboarding = setStepStatus(req.params.id, 'Data Mapping', 'completed');
+  res.json({ mapping: withIssues(approved), onboarding });
+});
+
+// Edit the generated tenant's plan or slug before it is approved
+app.patch('/api/customers/:id/tenant', (req, res) => {
+  const tenant = store.getTenantByCustomerId(req.params.id);
+  if (!tenant) {
+    return res.status(404).json({ error: 'Tenant not found' });
+  }
+  if (tenant.status !== 'pending') {
+    return res.status(409).json({ error: `Tenant is ${tenant.status} and can no longer be edited` });
+  }
+  const { errors, value } = validateTenantEdit(req.body);
+  if (value.slug && store.getTenants().some(t => t.slug === value.slug && t.id !== tenant.id)) {
+    errors.slug = `Slug "${value.slug}" is already used by another tenant`;
+  }
+  if (Object.keys(errors).length > 0) {
+    return res.status(400).json({ error: 'Invalid tenant data', fields: errors });
+  }
+  res.json(store.updateTenant(req.params.id, value));
+});
+
+// Approve the generated tenant; completes the Tenant Setup step
+app.post('/api/customers/:id/tenant/approve', (req, res) => {
+  const tenant = store.getTenantByCustomerId(req.params.id);
+  if (!tenant) {
+    return res.status(404).json({ error: 'Tenant not found' });
+  }
+  if (tenant.status !== 'pending') {
+    return res.status(409).json({ error: `Tenant is already ${tenant.status}` });
+  }
+  const approved = store.updateTenant(req.params.id, { status: 'approved', approvedAt: new Date().toISOString() });
+  const onboarding = setStepStatus(req.params.id, 'Tenant Setup', 'completed');
+  res.json({ tenant: approved, onboarding });
 });
 
 // Get the loaded data bundle for a customer (source for mapping, tenant setup, and import)

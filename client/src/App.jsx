@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CustomerInfoTab, DataSummary, ImportUpload } from './CustomerInfo';
 import { DataMappingTab } from './DataMapping';
+import { TenantSetupTab } from './TenantSetup';
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -116,10 +117,16 @@ function App() {
             customers={onboardingData}
             selectedId={selectedCustomerId}
             onSelect={setSelectedCustomerId}
+            onChanged={loadOnboarding}
           />
         )}
         {activeTab === 'tenant-setup' && (
-          <PlaceholderTab title="Tenant Setup" description="Provision and configure customer tenant" />
+          <TenantSetupTab
+            customers={onboardingData}
+            selectedId={selectedCustomerId}
+            onSelect={setSelectedCustomerId}
+            onChanged={loadOnboarding}
+          />
         )}
         {activeTab === 'import' && (
           <PlaceholderTab title="Import" description="Import customer data into the platform" />

@@ -45,50 +45,65 @@ function detectDateFormats(values) {
 }
 
 /**
+ * Maps one standard field from a chosen source column (or none).
+ * @param {import('./standards').StandardField} field
+ * @param {{ headers: string[], rows: Record<string, string>[] }} dataset
+ * @param {string | null} source
+ */
+function buildField(field, dataset, source) {
+  const mapped = {
+    key: field.key,
+    label: field.label,
+    type: field.type,
+    required: field.required,
+    source,
+    samples: source ? distinctValues(dataset.rows, source).slice(0, SAMPLE_COUNT) : []
+  };
+
+  if (field.type === 'enum') {
+    mapped.enum = field.enum;
+    mapped.values = source
+      ? distinctValues(dataset.rows, source).map(value => ({
+        source: value,
+        target: ENUM_LOOKUP[field.enum].get(normalize(value)) || null
+      }))
+      : [];
+  }
+
+  if (field.type === 'date') {
+    const candidates = source ? detectDateFormats(distinctValues(dataset.rows, source)) : [];
+    mapped.dateFormatCandidates = candidates;
+    mapped.dateFormat = candidates.length === 1 ? candidates[0] : null;
+  }
+
+  return mapped;
+}
+
+/** Source headers no field uses */
+function unusedHeaders(headers, fields) {
+  const used = new Set(fields.map(f => f.source).filter(Boolean));
+  return headers.filter(h => !used.has(h));
+}
+
+/**
  * Maps one dataset's headers and values onto its standard.
  * @param {{ headers: string[], rows: Record<string, string>[] }} dataset
- * @param {{ fields: import('./standards').StandardField[] }} standard
+ * @param {{ label: string, fields: import('./standards').StandardField[] }} standard
  */
 function mapDataset(dataset, standard) {
   const used = new Set();
-
   const fields = standard.fields.map(field => {
     const aliases = new Set(field.aliases.map(normalize));
     const source = dataset.headers.find(h => !used.has(h) && aliases.has(normalize(h))) || null;
     if (source) used.add(source);
-
-    const mapped = {
-      key: field.key,
-      label: field.label,
-      type: field.type,
-      required: field.required,
-      source,
-      samples: source ? distinctValues(dataset.rows, source).slice(0, SAMPLE_COUNT) : []
-    };
-
-    if (field.type === 'enum') {
-      mapped.enum = field.enum;
-      mapped.values = source
-        ? distinctValues(dataset.rows, source).map(value => ({
-          source: value,
-          target: ENUM_LOOKUP[field.enum].get(normalize(value)) || null
-        }))
-        : [];
-    }
-
-    if (field.type === 'date') {
-      const candidates = source ? detectDateFormats(distinctValues(dataset.rows, source)) : [];
-      mapped.dateFormatCandidates = candidates;
-      mapped.dateFormat = candidates.length === 1 ? candidates[0] : null;
-    }
-
-    return mapped;
+    return buildField(field, dataset, source);
   });
 
   return {
     label: standard.label,
+    headers: dataset.headers,
     fields,
-    unmappedHeaders: dataset.headers.filter(h => !used.has(h))
+    unmappedHeaders: unusedHeaders(dataset.headers, fields)
   };
 }
 
@@ -141,4 +156,4 @@ function listMappingIssues(mapping) {
   return issues;
 }
 
-module.exports = { generateMapping, listMappingIssues, detectDateFormats, normalize };
+module.exports = { generateMapping, listMappingIssues, detectDateFormats, normalize, buildField, unusedHeaders };
