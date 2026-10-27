@@ -58,12 +58,13 @@ describe('Domain Models', () => {
   });
 
   describe('createDefaultOnboardingSteps', () => {
-    it('should create 4 default steps', () => {
+    it('should create 3 default steps', () => {
       const steps = createDefaultOnboardingSteps();
       
-      assert.strictEqual(steps.length, 4);
+      // Data arrives with the uploaded zip, so there is no separate import step
+      assert.strictEqual(steps.length, 3);
       assert.strictEqual(steps[0].name, 'Customer Info');
-      assert.strictEqual(steps[3].name, 'Import');
+      assert.strictEqual(steps[2].name, 'Tenant Setup');
     });
 
     it('should set all steps to pending status', () => {

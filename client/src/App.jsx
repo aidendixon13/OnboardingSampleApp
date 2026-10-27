@@ -7,8 +7,7 @@ const TABS = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'customer-info', label: 'Customer Info' },
   { id: 'data-mapping', label: 'Data Mapping' },
-  { id: 'tenant-setup', label: 'Tenant Setup' },
-  { id: 'import', label: 'Import' }
+  { id: 'tenant-setup', label: 'Tenant Setup' }
 ];
 
 function App() {
@@ -84,7 +83,7 @@ function App() {
             data={onboardingData}
             loading={loading}
             error={error}
-            onOpenImport={() => setActiveTab('import')}
+            onImported={startIntake}
             onOpenStep={openStep}
           />
         )}
@@ -128,15 +127,12 @@ function App() {
             onChanged={loadOnboarding}
           />
         )}
-        {activeTab === 'import' && (
-          <ImportUpload onImported={startIntake} />
-        )}
       </main>
     </div>
   );
 }
 
-function DashboardTab({ data, loading, error, onOpenImport, onOpenStep }) {
+function DashboardTab({ data, loading, error, onImported, onOpenStep }) {
   if (loading) {
     return <div className="placeholder"><p>Loading...</p></div>;
   }
@@ -150,18 +146,17 @@ function DashboardTab({ data, loading, error, onOpenImport, onOpenStep }) {
     );
   }
 
-  if (data.length === 0) {
-    return (
-      <div className="placeholder">
-        <p>No customers in the onboarding queue</p>
-        <button type="button" className="submit-button empty-action" onClick={onOpenImport}>
-          Import customer data
-        </button>
-      </div>
-    );
-  }
+  return (
+    <div>
+      <ImportUpload onImported={onImported} />
 
-  return <OnboardingQueue data={data} onOpenStep={onOpenStep} />;
+      {data.length === 0 ? (
+        <div className="placeholder"><p>No customers in the onboarding queue</p></div>
+      ) : (
+        <OnboardingQueue data={data} onOpenStep={onOpenStep} />
+      )}
+    </div>
+  );
 }
 
 function OnboardingQueue({ data, onOpenStep }) {

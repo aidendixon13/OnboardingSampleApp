@@ -174,11 +174,10 @@ Demo **whatever you reached**, no matter how small.
 - ✅ Single page loads with "Onboarding Dashboard" heading
 
 ### Navigation Scaffold
-- ✅ Dashboard (shows onboarding queue)
-- ✅ Customer Info (placeholder)
-- ✅ Data Mapping (placeholder)
-- ✅ Tenant Setup (placeholder)
-- ✅ Import (placeholder)
+- ✅ Dashboard (customer data zip upload and the onboarding queue)
+- ✅ Customer Info (intake form after a zip upload, then customer details)
+- ✅ Data Mapping (pre-populated mapping to the platform standards; review and approve)
+- ✅ Tenant Setup (generated tenant; edit plan or slug and approve)
 
 ### Example Domain Models
 

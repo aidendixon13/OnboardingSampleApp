@@ -105,8 +105,7 @@ describe('POST /api/customers', () => {
     assert.deepStrictEqual(statuses, {
       'Customer Info': 'completed',
       'Data Mapping': 'in_progress',
-      'Tenant Setup': 'in_progress',
-      Import: 'pending'
+      'Tenant Setup': 'in_progress'
     });
 
     // A draft mapping was generated, with the ambiguous values flagged
@@ -185,7 +184,7 @@ describe('review and approval', () => {
     assert.strictEqual(approved.status, 200);
     assert.strictEqual(approved.body.mapping.status, 'approved');
     assert.strictEqual(approved.body.onboarding.steps.find(s => s.name === 'Data Mapping').status, 'completed');
-    assert.strictEqual(approved.body.onboarding.progressPercent, 50);
+    assert.strictEqual(approved.body.onboarding.progressPercent, 67);
 
     const locked = await send('PATCH', `/api/customers/${id}/mapping/clients/name`, { source: null });
     assert.strictEqual(locked.status, 409);

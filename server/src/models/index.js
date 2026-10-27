@@ -79,8 +79,7 @@ function createDefaultOnboardingSteps() {
   return [
     { id: 'step_1', name: 'Customer Info', status: 'pending', order: 1 },
     { id: 'step_2', name: 'Data Mapping', status: 'pending', order: 2 },
-    { id: 'step_3', name: 'Tenant Setup', status: 'pending', order: 3 },
-    { id: 'step_4', name: 'Import', status: 'pending', order: 4 }
+    { id: 'step_3', name: 'Tenant Setup', status: 'pending', order: 3 }
   ];
 }
 
