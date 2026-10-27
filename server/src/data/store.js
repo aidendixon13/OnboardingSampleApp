@@ -11,7 +11,9 @@ const store = {
   // Parsed customer data bundles, keyed by customer ID
   customerData: new Map(),
   // Uploaded bundles waiting for intake, keyed by import ID
-  imports: new Map()
+  imports: new Map(),
+  // Data mappings to the platform standards, keyed by customer ID
+  mappings: new Map()
 };
 
 // Store access functions
@@ -85,7 +87,18 @@ function deleteImport(id) {
   store.imports.delete(id);
 }
 
+function getMapping(customerId) {
+  return store.mappings.get(customerId);
+}
+
+function setMapping(customerId, mapping) {
+  store.mappings.set(customerId, mapping);
+  return mapping;
+}
+
 module.exports = {
+  getMapping,
+  setMapping,
   addImport,
   getImport,
   deleteImport,

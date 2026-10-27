@@ -7,6 +7,8 @@ const { createCustomer, createTenant, createDefaultOnboardingSteps, calculatePro
 const { validateCustomerInput } = require('./validation');
 const { loadCustomerBundle, BundleError } = require('./loader/customerBundle');
 const { suggestCustomerName, toTenantSlug } = require('./naming');
+const { generateMapping, listMappingIssues } = require('./mapping/generateMapping');
+const { ENUMS } = require('./mapping/standards');
 
 const app = express();
 const MAX_BUNDLE_BYTES = 20 * 1024 * 1024;
@@ -24,6 +26,15 @@ function summarizeData(data) {
     rowCounts: Object.fromEntries(Object.entries(data.datasets).map(([key, d]) => [key, d.rows.length])),
     files: Object.fromEntries(Object.entries(data.datasets).map(([key, d]) => [key, { file: d.file, headers: d.headers }]))
   };
+}
+
+function mappingSummary(mapping) {
+  if (!mapping) return null;
+  return { status: mapping.status, issueCount: listMappingIssues(mapping).length };
+}
+
+function withIssues(mapping) {
+  return { ...mapping, issues: listMappingIssues(mapping) };
 }
 
 function summarizeImport(staged) {
@@ -84,13 +95,19 @@ app.get('/api/imports/:id', (req, res) => {
   res.json(summarizeImport(staged));
 });
 
+// Standard picklist values, for choosing mapping targets during review
+app.get('/api/standards/enums', (req, res) => {
+  res.json(Object.fromEntries(Object.entries(ENUMS).map(([name, values]) => [name, Object.keys(values)])));
+});
+
 // Get all customers
 app.get('/api/customers', (req, res) => {
   res.json(store.getCustomers());
 });
 
-// Create a customer from intake fields and a staged import: generates the customer ID and tenant,
-// and moves the import's data onto the customer. Everything is validated before anything is stored.
+// Create a customer from intake fields and a staged import: generates the customer ID, tenant,
+// and a draft data mapping, and moves the import's data onto the customer.
+// Everything is validated and generated before anything is stored.
 app.post('/api/customers', (req, res) => {
   const { errors, value } = validateCustomerInput(req.body);
   const staged = value.importId && store.getImport(value.importId);
@@ -102,6 +119,9 @@ app.post('/api/customers', (req, res) => {
   }
 
   const { importId, plan, ...customerFields } = value;
+  const { id: _stagedId, ...data } = staged;
+  const mapping = generateMapping(data.datasets);
+
   const customer = store.addCustomer(createCustomer({ ...customerFields, id: `cust_${crypto.randomUUID()}` }));
   const tenant = store.addTenant(createTenant({
     id: `tenant_${crypto.randomUUID()}`,
@@ -112,14 +132,14 @@ app.post('/api/customers', (req, res) => {
     plan
   }));
 
-  const { id: _stagedId, ...data } = staged;
   store.setCustomerData(customer.id, data);
+  store.setMapping(customer.id, mapping);
   store.deleteImport(importId);
 
-  // Customer Info is done; the generated tenant waits for review
+  // Customer Info is done; the generated mapping and tenant wait for review
   const steps = createDefaultOnboardingSteps().map(step => {
     if (step.name === 'Customer Info') return { ...step, status: 'completed' };
-    if (step.name === 'Tenant Setup') return { ...step, status: 'in_progress' };
+    if (step.name === 'Data Mapping' || step.name === 'Tenant Setup') return { ...step, status: 'in_progress' };
     return step;
   });
   const state = store.addOnboardingState({
@@ -128,7 +148,16 @@ app.post('/api/customers', (req, res) => {
     progressPercent: calculateProgress(steps)
   });
 
-  res.status(201).json({ customer, tenant, onboarding: state, data: summarizeData(data) });
+  res.status(201).json({ customer, tenant, onboarding: state, data: summarizeData(data), mapping: withIssues(mapping) });
+});
+
+// Get a customer's data mapping, with what still needs review
+app.get('/api/customers/:id/mapping', (req, res) => {
+  const mapping = store.getMapping(req.params.id);
+  if (!mapping) {
+    return res.status(404).json({ error: 'Mapping not found' });
+  }
+  res.json(withIssues(mapping));
 });
 
 // Get the loaded data bundle for a customer (source for mapping, tenant setup, and import)
@@ -172,6 +201,7 @@ app.get('/api/onboarding', (req, res) => {
       customerIndustry: customer?.industry || '',
       customerRegion: customer?.region || '',
       tenant: store.getTenantByCustomerId(state.customerId) || null,
+      mapping: mappingSummary(store.getMapping(state.customerId)),
       data: summarizeData(store.getCustomerData(state.customerId))
     };
   });

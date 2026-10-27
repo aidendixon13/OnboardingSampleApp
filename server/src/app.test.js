@@ -104,10 +104,16 @@ describe('POST /api/customers', () => {
     const statuses = Object.fromEntries(body.onboarding.steps.map(s => [s.name, s.status]));
     assert.deepStrictEqual(statuses, {
       'Customer Info': 'completed',
-      'Data Mapping': 'pending',
+      'Data Mapping': 'in_progress',
       'Tenant Setup': 'in_progress',
       Import: 'pending'
     });
+
+    // A draft mapping was generated, with the ambiguous values flagged
+    assert.strictEqual(body.mapping.status, 'draft');
+    assert.strictEqual(body.mapping.issues.length, 2);
+    const fetched = await (await fetch(`${baseUrl}/api/customers/${body.customer.id}/mapping`)).json();
+    assert.strictEqual(fetched.datasets.clients.fields.find(f => f.key === 'name').source, 'business_name');
 
     // The staged import is consumed
     const reuse = await createCustomer({ ...INTAKE, importId: staged.importId });

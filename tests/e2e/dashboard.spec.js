@@ -55,9 +55,13 @@ test.describe('Onboarding Dashboard', () => {
     await page.getByRole('button', { name: 'Customer Info' }).click();
     await expect(page.locator('.import-upload h2')).toContainText('Import customer data');
 
-    // Other tabs are still placeholders
+    // Data Mapping has its own page
     await page.getByRole('button', { name: 'Data Mapping' }).click();
-    await expect(page.locator('.placeholder h2')).toContainText('Data Mapping');
+    await expect(page.locator('main h2')).toContainText('Data Mapping');
+
+    // Later steps are still placeholders
+    await page.getByRole('button', { name: 'Import', exact: true }).click();
+    await expect(page.locator('.placeholder h2')).toContainText('Import');
   });
 
   test('should onboard a customer from an uploaded data folder', async ({ page }) => {
@@ -85,6 +89,7 @@ test.describe('Onboarding Dashboard', () => {
     await expect(summary).toContainText(/tenant_[0-9a-f-]+/);
     await expect(summary).toContainText('premier-bookkeeping-');
     await expect(summary).toContainText('professional');
+    await expect(summary).toContainText('2 item(s) need review');
 
     // And the customer is in the queue at 25% with its data
     await page.getByRole('button', { name: 'Back to dashboard' }).click();
@@ -93,6 +98,15 @@ test.describe('Onboarding Dashboard', () => {
     await expect(card.locator('.progress-bar')).toContainText('25%');
     await expect(card.locator('.tenant-line')).toContainText('professional');
     await expect(card.locator('.data-summary')).toContainText('25 transactions');
+    await expect(card).toContainText('Mapping draft · 2 to review');
+
+    // The pre-populated mapping matches columns and flags what it could not map
+    await card.getByRole('button', { name: 'Review mapping' }).click();
+    await expect(page.locator('#customer-picker option:checked')).toHaveText(name);
+    await expect(page.locator('.mapping-status')).toContainText('2 item(s) need review');
+    await expect(page.locator('.mapping-issues')).toContainText('Transactions: Payment method value "Online Payment" is not mapped');
+    await expect(page.locator('.dataset-mapping').first()).toContainText('business_name');
+    await expect(page.locator('.dataset-mapping').first()).toContainText('DD-MM-YYYY');
   });
 
   test('should reject a data folder with malformed rows and say where', async ({ page }) => {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CustomerInfoTab, DataSummary, ImportUpload } from './CustomerInfo';
+import { DataMappingTab } from './DataMapping';
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -17,6 +18,13 @@ function App() {
   // Uploaded data waiting for intake, and the customer most recently created from it
   const [stagedImport, setStagedImport] = useState(null);
   const [createdCustomer, setCreatedCustomer] = useState(null);
+  // Customer the step pages (mapping, tenant) are working on
+  const [selectedCustomerId, setSelectedCustomerId] = useState(null);
+
+  const openStep = (tab, customerId) => {
+    setSelectedCustomerId(customerId);
+    setActiveTab(tab);
+  };
 
   const startIntake = (staged) => {
     setCreatedCustomer(null);
@@ -69,7 +77,13 @@ function App() {
 
       <main className="content">
         {activeTab === 'dashboard' && (
-          <DashboardTab data={onboardingData} loading={loading} error={error} onImported={startIntake} />
+          <DashboardTab
+            data={onboardingData}
+            loading={loading}
+            error={error}
+            onImported={startIntake}
+            onOpenStep={openStep}
+          />
         )}
         {activeTab === 'customer-info' && (
           <CustomerInfoTab
@@ -80,7 +94,12 @@ function App() {
             onCreated={(result) => {
               setStagedImport(null);
               setCreatedCustomer(result);
+              setSelectedCustomerId(result.customer.id);
               loadOnboarding();
+            }}
+            onReviewMapping={(customerId) => {
+              setCreatedCustomer(null);
+              openStep('data-mapping', customerId);
             }}
             onDone={() => {
               setCreatedCustomer(null);
@@ -89,7 +108,11 @@ function App() {
           />
         )}
         {activeTab === 'data-mapping' && (
-          <PlaceholderTab title="Data Mapping" description="Map customer data to platform configuration" />
+          <DataMappingTab
+            customers={onboardingData}
+            selectedId={selectedCustomerId}
+            onSelect={setSelectedCustomerId}
+          />
         )}
         {activeTab === 'tenant-setup' && (
           <PlaceholderTab title="Tenant Setup" description="Provision and configure customer tenant" />
@@ -102,7 +125,7 @@ function App() {
   );
 }
 
-function DashboardTab({ data, loading, error, onImported }) {
+function DashboardTab({ data, loading, error, onImported, onOpenStep }) {
   if (loading) {
     return <div className="placeholder"><p>Loading...</p></div>;
   }
@@ -123,13 +146,13 @@ function DashboardTab({ data, loading, error, onImported }) {
       {data.length === 0 ? (
         <div className="placeholder"><p>No customers in the onboarding queue</p></div>
       ) : (
-        <OnboardingQueue data={data} />
+        <OnboardingQueue data={data} onOpenStep={onOpenStep} />
       )}
     </div>
   );
 }
 
-function OnboardingQueue({ data }) {
+function OnboardingQueue({ data, onOpenStep }) {
   return (
     <div>
       <h2>Onboarding Queue</h2>
@@ -148,6 +171,16 @@ function OnboardingQueue({ data }) {
           {item.tenant && (
             <div className="tenant-line">
               Tenant <code>{item.tenant.slug}</code> · {item.tenant.plan} · {item.tenant.status}
+            </div>
+          )}
+          {item.mapping && (
+            <div className="tenant-line">
+              Mapping {item.mapping.status}
+              {item.mapping.issueCount > 0 && ` · ${item.mapping.issueCount} to review`}
+              {' · '}
+              <button type="button" className="link-button" onClick={() => onOpenStep('data-mapping', item.customerId)}>
+                Review mapping
+              </button>
             </div>
           )}
           {item.data && <DataSummary data={item.data} />}

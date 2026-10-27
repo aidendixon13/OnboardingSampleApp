@@ -175,7 +175,7 @@ function IntakeForm({ staged, onCreated, onCancel }) {
   );
 }
 
-function CreatedSummary({ created, onDone }) {
+function CreatedSummary({ created, onDone, onReviewMapping }) {
   const { customer, tenant } = created;
   return (
     <div className="created-summary">
@@ -190,7 +190,16 @@ function CreatedSummary({ created, onDone }) {
         <dt>Tenant status</dt><dd>{tenant.status}</dd>
       </dl>
       <DataSummary data={created.data} />
-      <button type="button" className="submit-button" onClick={onDone}>Back to dashboard</button>
+      <p className="muted">
+        Draft data mapping generated
+        {created.mapping.issues.length > 0 && `: ${created.mapping.issues.length} item(s) need review`}
+      </p>
+      <div className="button-row">
+        <button type="button" className="submit-button" onClick={() => onReviewMapping(customer.id)}>
+          Review data mapping
+        </button>
+        <button type="button" className="secondary-button" onClick={onDone}>Back to dashboard</button>
+      </div>
     </div>
   );
 }
@@ -198,9 +207,9 @@ function CreatedSummary({ created, onDone }) {
 /**
  * Onboarding entry: upload a data folder, fill in intake, then see the generated customer and tenant.
  */
-export function CustomerInfoTab({ staged, created, onImported, onClearImport, onCreated, onDone }) {
+export function CustomerInfoTab({ staged, created, onImported, onClearImport, onCreated, onDone, onReviewMapping }) {
   if (created) {
-    return <CreatedSummary created={created} onDone={onDone} />;
+    return <CreatedSummary created={created} onDone={onDone} onReviewMapping={onReviewMapping} />;
   }
   if (!staged) {
     return <ImportUpload onImported={onImported} />;
