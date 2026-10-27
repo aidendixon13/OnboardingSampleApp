@@ -236,3 +236,99 @@ header p {
   color: #374151;
   font-size: 0.85rem;
 }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.import-upload {
+  border: 1px dashed #93c5fd;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+  background: #f8fbff;
+}
+
+.import-upload h2 {
+  margin-bottom: 4px;
+}
+
+.import-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.import-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 20px;
+  border-radius: 6px;
+  background: #f3f4f6;
+}
+
+.import-summary .data-summary {
+  margin-top: 0;
+}
+
+.link-button {
+  border: none;
+  background: none;
+  color: #2563eb;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0;
+}
+
+.form-field select {
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 1rem;
+  background: white;
+}
+
+.form-field select[aria-invalid="true"] {
+  border-color: #dc2626;
+}
+
+.created-summary {
+  max-width: 560px;
+}
+
+.detail-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 16px 0;
+}
+
+.detail-list dt {
+  color: #6b7280;
+}
+
+.detail-list dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.created-summary .submit-button {
+  margin-top: 16px;
+}
+
+.tenant-line {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: #374151;
+}

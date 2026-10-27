@@ -16,6 +16,8 @@
  * @typedef {Object} Tenant
  * @property {string} id - Unique tenant identifier
  * @property {string} customerId - Associated customer ID
+ * @property {string} slug - Unique URL-safe tenant name, derived from the customer name
+ * @property {string} region - Hosting region, taken from the customer
  * @property {string} status - 'pending' | 'provisioning' | 'active' | 'failed'
  * @property {string} plan - 'starter' | 'professional' | 'enterprise'
  * @property {string} createdAt - ISO timestamp
@@ -61,6 +63,8 @@ function createTenant(data) {
   return {
     id: data.id || `tenant_${Date.now()}`,
     customerId: data.customerId || '',
+    slug: data.slug || '',
+    region: data.region || '',
     status: data.status || 'pending',
     plan: data.plan || 'starter',
     createdAt: data.createdAt || new Date().toISOString()

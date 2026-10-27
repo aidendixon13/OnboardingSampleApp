@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { CustomerInfoTab, DataSummary, ImportUpload } from './CustomerInfo';
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -13,6 +14,15 @@ function App() {
   const [onboardingData, setOnboardingData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Uploaded data waiting for intake, and the customer most recently created from it
+  const [stagedImport, setStagedImport] = useState(null);
+  const [createdCustomer, setCreatedCustomer] = useState(null);
+
+  const startIntake = (staged) => {
+    setCreatedCustomer(null);
+    setStagedImport(staged);
+    setActiveTab('customer-info');
+  };
 
   const loadOnboarding = () =>
     fetch('/api/onboarding')
@@ -59,12 +69,21 @@ function App() {
 
       <main className="content">
         {activeTab === 'dashboard' && (
-          <DashboardTab data={onboardingData} loading={loading} error={error} />
+          <DashboardTab data={onboardingData} loading={loading} error={error} onImported={startIntake} />
         )}
         {activeTab === 'customer-info' && (
           <CustomerInfoTab
-            onCreated={() => {
+            staged={stagedImport}
+            created={createdCustomer}
+            onImported={startIntake}
+            onClearImport={() => setStagedImport(null)}
+            onCreated={(result) => {
+              setStagedImport(null);
+              setCreatedCustomer(result);
               loadOnboarding();
+            }}
+            onDone={() => {
+              setCreatedCustomer(null);
               setActiveTab('dashboard');
             }}
           />
@@ -83,7 +102,7 @@ function App() {
   );
 }
 
-function DashboardTab({ data, loading, error }) {
+function DashboardTab({ data, loading, error, onImported }) {
   if (loading) {
     return <div className="placeholder"><p>Loading...</p></div>;
   }
@@ -97,10 +116,20 @@ function DashboardTab({ data, loading, error }) {
     );
   }
 
-  if (data.length === 0) {
-    return <div className="placeholder"><p>No customers in the onboarding queue</p></div>;
-  }
+  return (
+    <div>
+      <ImportUpload onImported={onImported} />
 
+      {data.length === 0 ? (
+        <div className="placeholder"><p>No customers in the onboarding queue</p></div>
+      ) : (
+        <OnboardingQueue data={data} />
+      )}
+    </div>
+  );
+}
+
+function OnboardingQueue({ data }) {
   return (
     <div>
       <h2>Onboarding Queue</h2>
@@ -116,6 +145,11 @@ function DashboardTab({ data, loading, error }) {
             <span>🏭 {item.customerIndustry}</span>
           </div>
 
+          {item.tenant && (
+            <div className="tenant-line">
+              Tenant <code>{item.tenant.slug}</code> · {item.tenant.plan} · {item.tenant.status}
+            </div>
+          )}
           {item.data && <DataSummary data={item.data} />}
 
           <div className="progress-section">
@@ -123,24 +157,6 @@ function DashboardTab({ data, loading, error }) {
             <Checklist steps={item.steps} />
           </div>
         </div>
-      ))}
-    </div>
-  );
-}
-
-const DATASET_LABELS = {
-  clients: 'clients',
-  contacts: 'contacts',
-  chartOfAccounts: 'accounts',
-  transactions: 'transactions'
-};
-
-function DataSummary({ data }) {
-  return (
-    <div className="data-summary">
-      <span>📦 {data.sourceName}</span>
-      {Object.entries(DATASET_LABELS).map(([key, label]) => (
-        <span key={key}>{data.rowCounts[key]} {label}</span>
       ))}
     </div>
   );
@@ -174,104 +190,6 @@ function Checklist({ steps }) {
         </li>
       ))}
     </ul>
-  );
-}
-
-const EMPTY_FORM = { name: '', industry: '', region: '', contactEmail: '' };
-
-const FIELDS = [
-  { key: 'name', label: 'Customer name', type: 'text' },
-  { key: 'industry', label: 'Industry', type: 'text' },
-  { key: 'region', label: 'Region', type: 'text' },
-  { key: 'contactEmail', label: 'Contact email', type: 'email' }
-];
-
-function CustomerInfoTab({ onCreated }) {
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [bundleFile, setBundleFile] = useState(null);
-  const [fieldErrors, setFieldErrors] = useState({});
-  const [bundleProblems, setBundleProblems] = useState([]);
-  const [submitError, setSubmitError] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    setSubmitting(true);
-    setFieldErrors({});
-    setBundleProblems([]);
-    setSubmitError(null);
-    try {
-      // Multipart so the intake fields and the zip are validated and saved together
-      const payload = new FormData();
-      Object.entries(form).forEach(([key, value]) => payload.append(key, value));
-      if (bundleFile) payload.append('dataBundle', bundleFile);
-
-      const res = await fetch('/api/customers', { method: 'POST', body: payload });
-      const body = await res.json().catch(() => ({}));
-      if ((res.status === 400 || res.status === 413) && body.fields) {
-        setFieldErrors(body.fields);
-        setBundleProblems(body.bundleProblems || []);
-        return;
-      }
-      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-      setForm(EMPTY_FORM);
-      setBundleFile(null);
-      onCreated(body.customer);
-    } catch (err) {
-      console.error('Failed to create customer:', err);
-      setSubmitError(err.message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <form className="customer-form" onSubmit={handleSubmit} noValidate>
-      <h2>Customer Info</h2>
-      <p style={{ color: '#6b7280', marginBottom: '20px' }}>
-        Add a customer to the onboarding queue.
-      </p>
-
-      {FIELDS.map(({ key, label, type }) => (
-        <div className="form-field" key={key}>
-          <label htmlFor={`customer-${key}`}>{label}</label>
-          <input
-            id={`customer-${key}`}
-            type={type}
-            value={form[key]}
-            aria-invalid={Boolean(fieldErrors[key])}
-            onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-          />
-          {fieldErrors[key] && <span className="field-error">{fieldErrors[key]}</span>}
-        </div>
-      ))}
-
-      <div className="form-field">
-        <label htmlFor="customer-dataBundle">Customer data (.zip)</label>
-        <input
-          id="customer-dataBundle"
-          type="file"
-          accept=".zip,application/zip"
-          aria-invalid={Boolean(fieldErrors.dataBundle)}
-          onChange={(e) => setBundleFile(e.target.files[0] || null)}
-        />
-        <span className="field-hint">
-          A zipped customer folder with clients.csv, contacts.csv, chart_of_accounts.csv, and transactions.csv
-        </span>
-        {fieldErrors.dataBundle && <span className="field-error">{fieldErrors.dataBundle}</span>}
-        {bundleProblems.length > 0 && (
-          <ul className="bundle-problems">
-            {bundleProblems.map(problem => <li key={problem}>{problem}</li>)}
-          </ul>
-        )}
-      </div>
-
-      {submitError && <p className="field-error">Failed to save customer: {submitError}</p>}
-
-      <button type="submit" className="submit-button" disabled={submitting}>
-        {submitting ? 'Saving...' : 'Add customer'}
-      </button>
-    </form>
   );
 }
 

@@ -9,7 +9,9 @@ const store = {
   tenants: [],
   onboardingStates: [],
   // Parsed customer data bundles, keyed by customer ID
-  customerData: new Map()
+  customerData: new Map(),
+  // Uploaded bundles waiting for intake, keyed by import ID
+  imports: new Map()
 };
 
 // Store access functions
@@ -70,7 +72,23 @@ function setCustomerData(customerId, data) {
   return data;
 }
 
+function addImport(staged) {
+  store.imports.set(staged.id, staged);
+  return staged;
+}
+
+function getImport(id) {
+  return store.imports.get(id);
+}
+
+function deleteImport(id) {
+  store.imports.delete(id);
+}
+
 module.exports = {
+  addImport,
+  getImport,
+  deleteImport,
   getCustomerData,
   setCustomerData,
   getCustomers,

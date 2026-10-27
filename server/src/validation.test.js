@@ -6,7 +6,9 @@ const valid = {
   name: ' ABC Accounting ',
   industry: 'Accounting',
   region: 'North America',
-  contactEmail: 'ops@abc.example.com'
+  contactEmail: 'ops@abc.example.com',
+  plan: 'professional',
+  importId: 'imp_123'
 };
 
 test('accepts a complete payload and trims values', () => {
@@ -17,7 +19,7 @@ test('accepts a complete payload and trims values', () => {
 
 test('reports every missing field', () => {
   const { errors } = validateCustomerInput({});
-  assert.deepStrictEqual(Object.keys(errors).sort(), ['contactEmail', 'industry', 'name', 'region']);
+  assert.deepStrictEqual(Object.keys(errors).sort(), ['contactEmail', 'importId', 'industry', 'name', 'plan', 'region']);
 });
 
 test('rejects blank and non-string values', () => {
@@ -33,5 +35,15 @@ test('rejects a malformed email', () => {
 
 test('rejects a non-object body', () => {
   const { errors } = validateCustomerInput(null);
-  assert.strictEqual(Object.keys(errors).length, 4);
+  assert.strictEqual(Object.keys(errors).length, 6);
+});
+
+test('rejects an unknown plan', () => {
+  const { errors } = validateCustomerInput({ ...valid, plan: 'gold' });
+  assert.match(errors.plan, /starter, professional, enterprise/);
+});
+
+test('rejects a name with no letters or digits', () => {
+  const { errors } = validateCustomerInput({ ...valid, name: '!!!' });
+  assert.ok(errors.name);
 });

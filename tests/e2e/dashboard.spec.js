@@ -51,52 +51,57 @@ test.describe('Onboarding Dashboard', () => {
   test('should switch between tabs', async ({ page }) => {
     await page.goto('/');
 
-    // Click on Customer Info tab
+    // Customer Info starts with the data upload
     await page.getByRole('button', { name: 'Customer Info' }).click();
-    
-    // Verify the customer form is shown
-    await expect(page.locator('.customer-form h2')).toContainText('Customer Info');
+    await expect(page.locator('.import-upload h2')).toContainText('Import customer data');
 
     // Other tabs are still placeholders
     await page.getByRole('button', { name: 'Data Mapping' }).click();
     await expect(page.locator('.placeholder h2')).toContainText('Data Mapping');
   });
 
-  test('should add a customer from a zipped data folder', async ({ page }) => {
+  test('should onboard a customer from an uploaded data folder', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: 'Customer Info' }).click();
 
-    // Submitting empty shows validation errors and stays on the form
-    await page.getByRole('button', { name: 'Add customer' }).click();
-    await expect(page.getByText('Customer name is required')).toBeVisible();
-    await expect(page.getByText('Customer data zip is required')).toBeVisible();
+    // Upload from the dashboard opens the intake page with the name pre-filled
+    await page.getByLabel('Customer data (.zip)').setInputFiles(sampleBundle('CustomerC_PremierBookkeeping'));
+    await page.getByRole('button', { name: 'Upload' }).click();
+    await expect(page.locator('.customer-form h2')).toContainText('Customer Info');
+    await expect(page.getByLabel('Customer name')).toHaveValue('Premier Bookkeeping');
+    await expect(page.locator('.import-summary')).toContainText('12 clients');
+
+    // Missing fields are reported and nothing is created
+    await page.getByRole('button', { name: 'Create customer' }).click();
+    await expect(page.getByText('Plan is required')).toBeVisible();
 
     const name = `Premier Bookkeeping ${Date.now()}`;
     await fillCustomerFields(page, name);
-    await page.getByLabel('Customer data (.zip)').setInputFiles(sampleBundle('CustomerC_PremierBookkeeping'));
-    await page.getByRole('button', { name: 'Add customer' }).click();
+    await page.getByLabel('Plan').selectOption('professional');
+    await page.getByRole('button', { name: 'Create customer' }).click();
 
-    // Lands on the dashboard with the new customer at 25% and its row counts
+    // Generated customer and tenant are shown
+    const summary = page.locator('.created-summary');
+    await expect(summary).toContainText(/cust_[0-9a-f-]+/);
+    await expect(summary).toContainText(/tenant_[0-9a-f-]+/);
+    await expect(summary).toContainText('premier-bookkeeping-');
+    await expect(summary).toContainText('professional');
+
+    // And the customer is in the queue at 25% with its data
+    await page.getByRole('button', { name: 'Back to dashboard' }).click();
     const card = page.locator('.customer-card', { hasText: name });
     await expect(card).toBeVisible();
     await expect(card.locator('.progress-bar')).toContainText('25%');
-    await expect(card.locator('.data-summary')).toContainText('12 clients');
+    await expect(card.locator('.tenant-line')).toContainText('professional');
     await expect(card.locator('.data-summary')).toContainText('25 transactions');
   });
 
   test('should reject a data folder with malformed rows and say where', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: 'Customer Info' }).click();
 
-    const name = `ABC Accounting ${Date.now()}`;
-    await fillCustomerFields(page, name);
     await page.getByLabel('Customer data (.zip)').setInputFiles(sampleBundle('CustomerA_ABCAccounting'));
-    await page.getByRole('button', { name: 'Add customer' }).click();
+    await page.getByRole('button', { name: 'Upload' }).click();
 
     await expect(page.locator('.bundle-problems')).toContainText('chart_of_accounts.csv: Line 33');
-
-    // Nothing was saved
-    await page.getByRole('button', { name: 'Dashboard' }).click();
-    await expect(page.locator('.customer-card', { hasText: name })).toHaveCount(0);
+    await expect(page.locator('.customer-form')).toHaveCount(0);
   });
 });
