@@ -51,9 +51,10 @@ test.describe('Onboarding Dashboard', () => {
   test('should switch between tabs', async ({ page }) => {
     await page.goto('/');
 
-    // Customer Info starts with the data upload
-    await page.getByRole('button', { name: 'Customer Info' }).click();
+    // Customer Info shows customer details; the upload lives on the dashboard
     await expect(page.locator('.import-upload h2')).toContainText('Import customer data');
+    await page.getByRole('button', { name: 'Customer Info' }).click();
+    await expect(page.locator('.customer-details h2')).toContainText('Customer Info');
 
     // Data Mapping has its own page
     await page.getByRole('button', { name: 'Data Mapping' }).click();
@@ -99,6 +100,12 @@ test.describe('Onboarding Dashboard', () => {
     await expect(card.locator('.tenant-line')).toContainText('professional');
     await expect(card.locator('.data-summary')).toContainText('25 transactions');
     await expect(card).toContainText('Mapping draft · 2 to review');
+
+    // Clicking the customer opens their details on Customer Info
+    await card.getByRole('button', { name }).click();
+    await expect(page.locator('.customer-details')).toContainText('ops@example.com');
+    await expect(page.locator('.customer-details')).toContainText(/cust_[0-9a-f-]+/);
+    await page.getByRole('button', { name: 'Dashboard' }).click();
 
     // The pre-populated mapping matches columns and flags what it could not map
     await card.getByRole('button', { name: 'Review mapping' }).click();

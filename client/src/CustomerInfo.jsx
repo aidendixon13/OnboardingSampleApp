@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { CustomerPicker } from './CustomerPicker';
 
 const DATASET_LABELS = {
   clients: 'clients',
@@ -204,15 +205,77 @@ function CreatedSummary({ created, onDone, onReviewMapping }) {
   );
 }
 
+function CustomerDetails({ customers, selectedId, onSelect }) {
+  const [customer, setCustomer] = useState(null);
+  const [error, setError] = useState(null);
+  const item = customers.find(c => c.customerId === selectedId);
+
+  useEffect(() => {
+    setCustomer(null);
+    setError(null);
+    if (!selectedId) return;
+    fetch(`/api/customers/${selectedId}`)
+      .then(async (res) => {
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+        setCustomer(body);
+      })
+      .catch(err => {
+        console.error('Failed to load customer:', err);
+        setError(err.message);
+      });
+  }, [selectedId]);
+
+  return (
+    <div className="customer-details">
+      <h2>Customer Info</h2>
+      {customers.length === 0 ? (
+        <div className="placeholder">
+          <p>No customers yet. Upload customer data on the Dashboard to start onboarding.</p>
+        </div>
+      ) : (
+        <CustomerPicker customers={customers} selectedId={selectedId} onSelect={onSelect} />
+      )}
+
+      {error && <p className="field-error">Failed to load customer: {error}</p>}
+      {selectedId && !customer && !error && <p>Loading...</p>}
+
+      {customer && (
+        <>
+          <dl className="detail-list">
+            <dt>Customer</dt><dd>{customer.name}</dd>
+            <dt>Customer ID</dt><dd><code>{customer.id}</code></dd>
+            <dt>Industry</dt><dd>{customer.industry}</dd>
+            <dt>Region</dt><dd>{customer.region}</dd>
+            <dt>Contact email</dt><dd>{customer.contactEmail}</dd>
+            <dt>Created</dt><dd>{new Date(customer.createdAt).toLocaleString()}</dd>
+            {item?.tenant && (
+              <>
+                <dt>Tenant</dt>
+                <dd><code>{item.tenant.slug}</code> · {item.tenant.plan} · {item.tenant.status}</dd>
+              </>
+            )}
+          </dl>
+          {item?.data && <DataSummary data={item.data} />}
+        </>
+      )}
+    </div>
+  );
+}
+
 /**
- * Onboarding entry: upload a data folder, fill in intake, then see the generated customer and tenant.
+ * Customer Info: intake for freshly uploaded data, then the generated customer and tenant,
+ * otherwise the details of the selected customer.
  */
-export function CustomerInfoTab({ staged, created, onImported, onClearImport, onCreated, onDone, onReviewMapping }) {
+export function CustomerInfoTab({
+  staged, created, customers, selectedId, onSelect,
+  onClearImport, onCreated, onDone, onReviewMapping
+}) {
   if (created) {
     return <CreatedSummary created={created} onDone={onDone} onReviewMapping={onReviewMapping} />;
   }
-  if (!staged) {
-    return <ImportUpload onImported={onImported} />;
+  if (staged) {
+    return <IntakeForm key={staged.importId} staged={staged} onCreated={onCreated} onCancel={onClearImport} />;
   }
-  return <IntakeForm key={staged.importId} staged={staged} onCreated={onCreated} onCancel={onClearImport} />;
+  return <CustomerDetails customers={customers} selectedId={selectedId} onSelect={onSelect} />;
 }

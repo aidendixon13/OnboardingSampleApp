@@ -42,6 +42,8 @@ function App() {
       })
       .then(data => {
         setOnboardingData(data);
+        // Step pages default to the first customer in the queue
+        setSelectedCustomerId(prev => prev || data[0]?.customerId || null);
         setError(null);
         setLoading(false);
       })
@@ -89,7 +91,9 @@ function App() {
           <CustomerInfoTab
             staged={stagedImport}
             created={createdCustomer}
-            onImported={startIntake}
+            customers={onboardingData}
+            selectedId={selectedCustomerId}
+            onSelect={setSelectedCustomerId}
             onClearImport={() => setStagedImport(null)}
             onCreated={(result) => {
               setStagedImport(null);
@@ -162,7 +166,11 @@ function OnboardingQueue({ data, onOpenStep }) {
 
       {data.map(item => (
         <div key={item.customerId} className="customer-card">
-          <h3>{item.customerName}</h3>
+          <h3>
+            <button type="button" className="card-title-button" onClick={() => onOpenStep('customer-info', item.customerId)}>
+              {item.customerName}
+            </button>
+          </h3>
           <div className="customer-meta">
             <span>📍 {item.customerRegion}</span>
             <span>🏭 {item.customerIndustry}</span>
