@@ -75,6 +75,8 @@ const ENUMS = {
  * @property {boolean} required
  * @property {string} [enum] - Key into ENUMS when type is 'enum'
  * @property {string[]} aliases - Source headers known to mean this field
+ * @property {boolean} [freeText] - Holds prose that exports may leave with unquoted commas;
+ *   the loader rejoins extra fields into this column
  */
 
 /** @type {Record<string, { label: string, fields: StandardField[] }>} */
@@ -91,7 +93,7 @@ const STANDARDS = {
       { key: 'annualRevenue', label: 'Annual revenue', type: 'number', required: false, aliases: ['Annual Revenue', 'yearlyRevenue', 'gross_revenue'] },
       { key: 'industry', label: 'Industry', type: 'string', required: false, aliases: ['Industry', 'sectorCode', 'industry_sector'] },
       { key: 'paymentTerms', label: 'Payment terms', type: 'enum', enum: 'paymentTerms', required: false, aliases: ['Payment Terms', 'billingTerms', 'credit_terms'] },
-      { key: 'primaryContact', label: 'Primary contact', type: 'string', required: false, aliases: ['Primary Contact', 'mainContact', 'key_contact_name'] }
+      { key: 'primaryContact', label: 'Primary contact', type: 'string', required: false, freeText: true, aliases: ['Primary Contact', 'mainContact', 'key_contact_name'] }
     ]
   },
   contacts: {
@@ -118,7 +120,7 @@ const STANDARDS = {
       { key: 'subType', label: 'Sub type', type: 'string', required: false, aliases: ['Sub Type', 'acctSubCategory', 'sub_category'] },
       { key: 'normalBalance', label: 'Normal balance', type: 'enum', enum: 'debitCredit', required: true, aliases: ['Normal Balance', 'balanceType', 'debit_credit'] },
       { key: 'status', label: 'Status', type: 'enum', enum: 'activeFlag', required: true, aliases: ['Status', 'activeFlag', 'is_active'] },
-      { key: 'description', label: 'Description', type: 'string', required: false, aliases: ['Description', 'acctDescription', 'notes'] },
+      { key: 'description', label: 'Description', type: 'string', required: false, freeText: true, aliases: ['Description', 'acctDescription', 'notes'] },
       { key: 'parentAccount', label: 'Parent account', type: 'string', required: false, aliases: ['Parent Account', 'parentAcctCode', 'parent_code'] }
     ]
   },
@@ -129,7 +131,7 @@ const STANDARDS = {
       { key: 'date', label: 'Date', type: 'date', required: true, aliases: ['Date', 'txnDate', 'posting_date'] },
       { key: 'clientId', label: 'Client ID', type: 'string', required: true, aliases: ['Client ID', 'clientCode', 'customer_id'] },
       { key: 'accountNumber', label: 'Account number', type: 'string', required: true, aliases: ['Account Number', 'acctCode', 'nominal_code'] },
-      { key: 'description', label: 'Description', type: 'string', required: false, aliases: ['Description', 'memo', 'narrative'] },
+      { key: 'description', label: 'Description', type: 'string', required: false, freeText: true, aliases: ['Description', 'memo', 'narrative'] },
       { key: 'type', label: 'Debit / credit', type: 'enum', enum: 'debitCredit', required: true, aliases: ['Transaction Type', 'entryType', 'dr_cr'] },
       { key: 'amount', label: 'Amount', type: 'number', required: true, aliases: ['Amount', 'txnAmount', 'amount_gbp'] },
       { key: 'reference', label: 'Reference', type: 'string', required: false, aliases: ['Reference Number', 'docNumber', 'document_ref'] },

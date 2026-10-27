@@ -54,9 +54,38 @@ describe('parseCsv', () => {
   });
 
   it('reports rows with the wrong field count by line number instead of guessing', () => {
-    const { rows, errors } = parseCsv('a,b\n1,2\n3,4,5\n');
+    const { rows, errors, repairs } = parseCsv('a,b\n1,2\n3,4,5\n');
     assert.strictEqual(rows.length, 1);
     assert.deepStrictEqual(errors, ['Line 3: expected 2 fields, found 3']);
+    assert.deepStrictEqual(repairs, []);
+  });
+
+  it('rejoins extra fields into the repair column, keeping the original commas', () => {
+    const { rows, errors, repairs } = parseCsv(
+      'id,note,parent\n1,Electric, gas, water,6000\n2,plain,7000\n',
+      { repairColumn: 'note' }
+    );
+    assert.deepStrictEqual(errors, []);
+    assert.deepStrictEqual(rows, [
+      { id: '1', note: 'Electric, gas, water', parent: '6000' },
+      { id: '2', note: 'plain', parent: '7000' }
+    ]);
+    assert.deepStrictEqual(repairs, [{ line: 2, column: 'note', value: 'Electric, gas, water', fieldsFound: 5 }]);
+  });
+
+  it('repairs a trailing free-text column', () => {
+    const { rows, repairs } = parseCsv('id,contact\nX1,Williams, Robert\n', { repairColumn: 'contact' });
+    assert.strictEqual(rows[0].contact, 'Williams, Robert');
+    assert.strictEqual(repairs.length, 1);
+  });
+
+  it('still rejects rows with too few fields, even with a repair column', () => {
+    const { errors } = parseCsv('a,b,c\n1,2\n', { repairColumn: 'b' });
+    assert.deepStrictEqual(errors, ['Line 2: expected 3 fields, found 2']);
+  });
+
+  it('refuses a repair column that is not a header', () => {
+    assert.throws(() => parseCsv('a,b\n1,2\n', { repairColumn: 'z' }), /not a header/);
   });
 
   it('reports duplicate and blank headers', () => {
@@ -81,15 +110,35 @@ describe('loadCustomerBundle', () => {
     assert.strictEqual(datasets.transactions.rows.length, 25);
   });
 
-  it('rejects the ABC sample: an unquoted comma in a chart of accounts description', () => {
-    const problems = problemsOf(() => loadCustomerBundle(zipSampleFolder('CustomerA_ABCAccounting')));
-    assert.deepStrictEqual(problems, ['chart_of_accounts.csv: Line 33: expected 8 fields, found 10']);
+  it('loads the Premier sample with nothing repaired', () => {
+    assert.deepStrictEqual(loadCustomerBundle(zipSampleFolder('CustomerC_PremierBookkeeping')).repairs, []);
   });
 
-  it('rejects the XYZ sample: unquoted "Last, First" contact names on every client row', () => {
-    const problems = problemsOf(() => loadCustomerBundle(zipSampleFolder('CustomerB_XYZFinancialServices')));
-    assert.strictEqual(problems.length, 12);
-    assert.ok(problems.every(p => p.startsWith('clients.csv: Line ')));
+  it('loads the ABC sample, repairing the unquoted commas in one account description', () => {
+    const { datasets, repairs } = loadCustomerBundle(zipSampleFolder('CustomerA_ABCAccounting'));
+    assert.deepStrictEqual(repairs, [{
+      file: 'chart_of_accounts.csv', line: 33, column: 'Description', value: 'Electric, gas, water', fieldsFound: 10
+    }]);
+    const utilities = datasets.chartOfAccounts.rows.find(r => r['Account Number'] === '6300');
+    assert.strictEqual(utilities.Description, 'Electric, gas, water');
+    assert.strictEqual(utilities['Parent Account'], '6000');
+    assert.strictEqual(datasets.chartOfAccounts.rows.length, 39);
+  });
+
+  it('loads the XYZ sample, repairing the "Last, First" contact name on every client row', () => {
+    const { datasets, repairs } = loadCustomerBundle(zipSampleFolder('CustomerB_XYZFinancialServices'));
+    assert.strictEqual(repairs.length, 12);
+    assert.ok(repairs.every(r => r.file === 'clients.csv' && r.column === 'mainContact'));
+    assert.strictEqual(datasets.clients.rows[0].mainContact, 'Williams, Robert');
+    assert.strictEqual(datasets.clients.rows[0].billingTerms, 'NET30');
+  });
+
+  it('rejects extra fields in a file with no free-text column', () => {
+    const problems = problemsOf(() => loadCustomerBundle(zipFiles({
+      ...MINIMAL,
+      'contacts.csv': 'Contact ID,First Name\nCT1,Ann,Extra\n'
+    })));
+    assert.deepStrictEqual(problems, ['contacts.csv: Line 2: expected 2 fields, found 3']);
   });
 
   it('accepts files at the zip root and names the source after the upload', () => {

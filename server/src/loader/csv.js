@@ -62,16 +62,26 @@ function tokenize(text) {
 
 /**
  * Parses CSV text with a header row into objects keyed by header.
- * Rows whose field count differs from the header are reported, not repaired.
+ *
+ * Exports often leave commas in free text unquoted ("Williams, Robert"), which splits one value
+ * into several fields. When `repairColumn` names a free-text header, a row with extra fields is
+ * repaired by joining the extras back into that column, and the repair is reported so a person
+ * can check it. Any other field-count mismatch is an error.
  * @param {string} text
- * @returns {{ headers: string[], rows: Record<string, string>[], errors: string[] }}
+ * @param {{ repairColumn?: string | null }} [options]
+ * @returns {{
+ *   headers: string[],
+ *   rows: Record<string, string>[],
+ *   errors: string[],
+ *   repairs: { line: number, column: string, value: string, fieldsFound: number }[]
+ * }}
  */
-function parseCsv(text) {
+function parseCsv(text, { repairColumn = null } = {}) {
   const records = tokenize(text.replace(/^﻿/, ''))
     .filter(r => !(r.fields.length === 1 && r.fields[0].trim() === ''));
 
   if (records.length === 0) {
-    return { headers: [], rows: [], errors: ['File is empty'] };
+    return { headers: [], rows: [], errors: ['File is empty'], repairs: [] };
   }
 
   const headers = records[0].fields.map(h => h.trim());
@@ -86,16 +96,29 @@ function parseCsv(text) {
     errors.push(`Duplicate header(s): ${[...new Set(duplicates)].join(', ')}`);
   }
 
+  const repairIndex = repairColumn === null ? -1 : headers.indexOf(repairColumn);
+  if (repairColumn !== null && repairIndex === -1) {
+    throw new Error(`Repair column "${repairColumn}" is not a header`);
+  }
+
   const rows = [];
-  for (const { fields, line } of records.slice(1)) {
-    if (fields.length !== headers.length) {
-      errors.push(`Line ${line}: expected ${headers.length} fields, found ${fields.length}`);
+  const repairs = [];
+  for (const { fields: raw, line } of records.slice(1)) {
+    let fields = raw;
+    const extra = raw.length - headers.length;
+    if (extra > 0 && repairIndex !== -1) {
+      // Rejoin with the commas the split removed, so the value reads exactly as exported
+      const joined = raw.slice(repairIndex, repairIndex + extra + 1).join(',');
+      fields = [...raw.slice(0, repairIndex), joined, ...raw.slice(repairIndex + extra + 1)];
+      repairs.push({ line, column: repairColumn, value: joined.trim(), fieldsFound: raw.length });
+    } else if (extra !== 0) {
+      errors.push(`Line ${line}: expected ${headers.length} fields, found ${raw.length}`);
       continue;
     }
     rows.push(Object.fromEntries(headers.map((h, i) => [h, fields[i].trim()])));
   }
 
-  return { headers, rows, errors };
+  return { headers, rows, errors, repairs };
 }
 
 module.exports = { parseCsv };

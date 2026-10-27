@@ -145,13 +145,34 @@ test.describe('Onboarding Dashboard', () => {
     await expect(card.locator('.tenant-line').first()).toContainText('enterprise · approved');
   });
 
-  test('should reject a data folder with malformed rows and say where', async ({ page }) => {
+  test('should list rows repaired from unquoted commas on the intake page', async ({ page }) => {
     await page.goto('/');
-
     await page.getByLabel('Customer data (.zip)').setInputFiles(sampleBundle('CustomerA_ABCAccounting'));
     await page.getByRole('button', { name: 'Upload' }).click();
 
-    await expect(page.locator('.bundle-problems')).toContainText('chart_of_accounts.csv: Line 33');
+    const repaired = page.locator('.repaired-rows');
+    await expect(repaired).toContainText('1 repaired row(s)');
+    await expect(repaired).toContainText('chart_of_accounts.csv');
+    await expect(repaired).toContainText('Electric, gas, water');
+
+    await page.getByRole('button', { name: 'Upload a different file' }).click();
+    await page.getByLabel('Customer data (.zip)').setInputFiles(sampleBundle('CustomerB_XYZFinancialServices'));
+    await page.getByRole('button', { name: 'Upload' }).click();
+    await expect(page.locator('.repaired-rows')).toContainText('12 repaired row(s)');
+    await expect(page.locator('.repaired-rows')).toContainText('Williams, Robert');
+  });
+
+  test('should reject an incomplete data folder and say what is missing', async ({ page }) => {
+    await page.goto('/');
+
+    const zip = new AdmZip();
+    zip.addFile('clients.csv', Buffer.from('id\n1\n'));
+    await page.getByLabel('Customer data (.zip)').setInputFiles({
+      name: 'incomplete.zip', mimeType: 'application/zip', buffer: zip.toBuffer()
+    });
+    await page.getByRole('button', { name: 'Upload' }).click();
+
+    await expect(page.locator('.bundle-problems')).toContainText('Missing contacts.csv');
     await expect(page.locator('.customer-form')).toHaveCount(0);
   });
 });

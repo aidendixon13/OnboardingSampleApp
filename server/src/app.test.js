@@ -74,10 +74,43 @@ describe('POST /api/imports', () => {
     assert.ok(body.files.clients.headers.includes('business_name'));
   });
 
+  it('stages every sample folder, reporting the rows it repaired', async () => {
+    const expected = {
+      CustomerA_ABCAccounting: 1,
+      CustomerB_XYZFinancialServices: 12,
+      CustomerC_PremierBookkeeping: 0
+    };
+    for (const [folder, repairCount] of Object.entries(expected)) {
+      const { status, body } = await uploadBundle(sampleZip(folder));
+      assert.strictEqual(status, 201, `${folder}: ${JSON.stringify(body)}`);
+      assert.strictEqual(body.repairs.length, repairCount, folder);
+    }
+    const { body } = await uploadBundle(sampleZip('CustomerA_ABCAccounting'));
+    assert.deepStrictEqual(body.repairs, [{
+      file: 'chart_of_accounts.csv', line: 33, column: 'Description', value: 'Electric, gas, water', fieldsFound: 10
+    }]);
+  });
+
   it('rejects a malformed bundle with its problems', async () => {
-    const { status, body } = await uploadBundle(sampleZip('CustomerA_ABCAccounting'));
+    const zip = new AdmZip();
+    zip.addFile('clients.csv', Buffer.from('id\n1\n'));
+    const { status, body } = await uploadBundle(zip.toBuffer());
     assert.strictEqual(status, 400);
-    assert.deepStrictEqual(body.problems, ['chart_of_accounts.csv: Line 33: expected 8 fields, found 10']);
+    assert.deepStrictEqual(body.problems, [
+      'Missing contacts.csv',
+      'Missing chart_of_accounts.csv',
+      'Missing transactions.csv'
+    ]);
+  });
+
+  it('creates customers from the repaired samples and keeps the repairs with their data', async () => {
+    const { body: staged } = await uploadBundle(sampleZip('CustomerB_XYZFinancialServices'));
+    const { status, body } = await createCustomer({ ...INTAKE, name: 'XYZ Financial Services', importId: staged.importId });
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.data.repairs.length, 12);
+    const primaryContact = body.mapping.datasets.clients.fields.find(f => f.key === 'primaryContact');
+    assert.strictEqual(primaryContact.source, 'mainContact');
+    assert.ok(primaryContact.samples.includes('Williams, Robert'));
   });
 
   it('requires a file', async () => {

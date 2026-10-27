@@ -92,6 +92,40 @@ export function ImportUpload({ onImported }) {
   );
 }
 
+/** Rows the loader rejoined because a free-text value had unquoted commas */
+function RepairedRows({ repairs }) {
+  if (repairs.length === 0) return null;
+  return (
+    <section className="repaired-rows" aria-labelledby="repaired-rows-heading">
+      <h3 id="repaired-rows-heading">{repairs.length} repaired row(s): check before creating the customer</h3>
+      <p className="muted">
+        These rows had more fields than the header because a free-text value contained unquoted commas.
+        The extra pieces were joined back into that column.
+      </p>
+      <table className="mapping-table">
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Line</th>
+            <th>Column</th>
+            <th>Repaired value</th>
+          </tr>
+        </thead>
+        <tbody>
+          {repairs.map(r => (
+            <tr key={`${r.file}-${r.line}`}>
+              <td><code>{r.file}</code></td>
+              <td>{r.line}</td>
+              <td><code>{r.column}</code></td>
+              <td>{r.value}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
 function IntakeForm({ staged, onCreated, onCancel }) {
   const [form, setForm] = useState({
     name: staged.suggestedName,
@@ -137,6 +171,8 @@ function IntakeForm({ staged, onCreated, onCancel }) {
         <DataSummary data={staged} />
         <button type="button" className="link-button" onClick={onCancel}>Upload a different file</button>
       </div>
+
+      <RepairedRows repairs={staged.repairs} />
 
       {FIELDS.map(({ key, label, type }) => (
         <div className="form-field" key={key}>

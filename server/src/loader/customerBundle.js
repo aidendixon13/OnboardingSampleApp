@@ -5,6 +5,7 @@
 
 const AdmZip = require('adm-zip');
 const { parseCsv } = require('./csv');
+const { STANDARDS } = require('../mapping/standards');
 
 const DATASETS = [
   { key: 'clients', file: 'clients.csv' },
@@ -15,6 +16,27 @@ const DATASETS = [
 
 // Files that OS zip tools add on their own
 const IGNORED = [/^__MACOSX\//, /(^|\/)\.DS_Store$/, /(^|\/)Thumbs\.db$/i, /(^|\/)desktop\.ini$/i];
+
+const normalizeHeader = (h) => h.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/** Header aliases of each dataset's free-text fields, normalized */
+const FREE_TEXT_ALIASES = Object.fromEntries(
+  Object.entries(STANDARDS).map(([key, { fields }]) => [
+    key,
+    new Set(fields.filter(f => f.freeText).flatMap(f => f.aliases).map(normalizeHeader))
+  ])
+);
+
+/**
+ * The one free-text column extra fields can be rejoined into, or null when the file has none
+ * or more than one (then there is no safe place to put them).
+ * @param {string} datasetKey
+ * @param {string[]} headers
+ */
+function findRepairColumn(datasetKey, headers) {
+  const matches = headers.filter(h => FREE_TEXT_ALIASES[datasetKey].has(normalizeHeader(h)));
+  return matches.length === 1 ? matches[0] : null;
+}
 
 class BundleError extends Error {
   /** @param {string[]} problems */
@@ -49,7 +71,11 @@ function resolveRoot(paths) {
  * Loads and validates a customer data bundle.
  * @param {Buffer} buffer - Zip file contents
  * @param {string} [fileName] - Original upload name, used when the zip has no top-level folder
- * @returns {{ sourceName: string, datasets: Record<string, { file: string, headers: string[], rows: Record<string, string>[] }> }}
+ * @returns {{
+ *   sourceName: string,
+ *   datasets: Record<string, { file: string, headers: string[], rows: Record<string, string>[] }>,
+ *   repairs: { file: string, line: number, column: string, value: string, fieldsFound: number }[]
+ * }}
  * @throws {BundleError} with every problem found, so the upload can be fixed in one pass
  */
 function loadCustomerBundle(buffer, fileName = '') {
@@ -92,6 +118,7 @@ function loadCustomerBundle(buffer, fileName = '') {
   }
 
   const datasets = {};
+  const repairs = [];
   for (const { key, file } of DATASETS) {
     const entry = byName.get(file);
     if (!entry) {
@@ -100,12 +127,14 @@ function loadCustomerBundle(buffer, fileName = '') {
     }
     let parsed;
     try {
-      parsed = parseCsv(entry.getData().toString('utf8'));
+      const text = entry.getData().toString('utf8');
+      parsed = parseCsv(text, { repairColumn: findRepairColumn(key, parseCsv(text).headers) });
     } catch (err) {
       errors.push(`${file}: ${err.message}`);
       continue;
     }
     errors.push(...parsed.errors.map(e => `${file}: ${e}`));
+    repairs.push(...parsed.repairs.map(r => ({ file, ...r })));
     datasets[key] = { file, headers: parsed.headers, rows: parsed.rows };
   }
 
@@ -114,7 +143,7 @@ function loadCustomerBundle(buffer, fileName = '') {
   }
 
   const sourceName = prefix ? prefix.slice(0, -1) : fileName.replace(/\.zip$/i, '');
-  return { sourceName, datasets };
+  return { sourceName, datasets, repairs };
 }
 
 module.exports = { loadCustomerBundle, BundleError, DATASETS };

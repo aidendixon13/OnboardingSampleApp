@@ -25,7 +25,9 @@ function summarizeData(data) {
     sourceName: data.sourceName,
     loadedAt: data.loadedAt,
     rowCounts: Object.fromEntries(Object.entries(data.datasets).map(([key, d]) => [key, d.rows.length])),
-    files: Object.fromEntries(Object.entries(data.datasets).map(([key, d]) => [key, { file: d.file, headers: d.headers }]))
+    files: Object.fromEntries(Object.entries(data.datasets).map(([key, d]) => [key, { file: d.file, headers: d.headers }])),
+    // Rows the loader rejoined, so a reviewer can check them
+    repairs: data.repairs
   };
 }
 
